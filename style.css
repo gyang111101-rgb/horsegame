@@ -1,0 +1,410 @@
+:root {
+    --bg-color: #1a1a1a;
+    --text-color: #ffffff;
+    --primary-color: #ffcc00;
+    /* Gold/Yellow for highlights */
+    --lane-color: #2a2a2a;
+    --line-color: #444;
+
+    /* Horse Colors */
+    --h1-color: #FF4136;
+    /* Red */
+    --h2-color: #0074D9;
+    /* Blue */
+    --h3-color: #2ECC40;
+    /* Green */
+    --h4-color: #FFDC00;
+    /* Yellow */
+    --h5-color: #B10DC9;
+    /* Purple */
+    --h6-color: #FF851B;
+    /* Orange */
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    user-select: none;
+    /* Prevent selection for cleaner party UI */
+}
+
+body {
+    font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    overflow: hidden;
+    height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+#app {
+    width: 100%;
+    max-width: 1200px;
+    height: 90vh;
+    position: relative;
+    overflow: hidden;
+}
+
+.screen {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: none;
+    /* Hidden by default */
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.5s ease;
+}
+
+.screen.active {
+    display: flex;
+    opacity: 1;
+}
+
+/* === Typography === */
+.game-title {
+    font-size: 4rem;
+    margin-bottom: 1rem;
+    color: var(--primary-color);
+    text-shadow: 0 0 20px rgba(255, 204, 0, 0.3);
+}
+
+.subtitle {
+    font-size: 1.5rem;
+    margin-bottom: 3rem;
+    opacity: 0.8;
+}
+
+/* === Buttons === */
+/* Standard modern button styles */
+button {
+    cursor: pointer;
+    font-size: 1.5rem;
+    font-weight: bold;
+    padding: 1rem 3rem;
+    border: none;
+    border-radius: 50px;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.primary-btn {
+    background-color: var(--primary-color);
+    color: #000;
+    margin-top: 2rem;
+}
+
+.primary-btn:hover {
+    transform: scale(1.05);
+    box-shadow: 0 0 30px rgba(255, 204, 0, 0.5);
+}
+
+.secondary-btn {
+    background-color: #444;
+    color: #fff;
+    margin-top: 2rem;
+}
+
+.secondary-btn:hover {
+    transform: scale(1.05);
+    background-color: #555;
+}
+
+/* === Setup Screen === */
+.betting-list {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    /* 2 columns for 6 inputs */
+    gap: 1.5rem;
+    width: 80%;
+    max-width: 800px;
+}
+
+.bet-item {
+    display: flex;
+    align-items: center;
+    background: #333;
+    padding: 1rem;
+    border-radius: 12px;
+    border-left: 10px solid transparent;
+}
+
+.bet-item input {
+    background: transparent;
+    border: none;
+    color: #fff;
+    font-size: 1.5rem;
+    margin-left: 1rem;
+    width: 100%;
+    outline: none;
+}
+
+.bet-item input::placeholder {
+    color: #777;
+}
+
+.horse-badge {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 1.2rem;
+    color: #fff;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+/* === Race Screen === */
+#race-screen {
+    justify-content: flex-start;
+    padding-top: 2rem;
+}
+
+.track-header h2 {
+    font-size: 2.5rem;
+    color: var(--primary-color);
+    margin-bottom: 2rem;
+}
+
+#track-container {
+    width: 95%;
+    position: relative;
+    background: var(--lane-color);
+    border-radius: 8px;
+    padding: 20px 0;
+    border-right: 5px dashed #fff;
+    /* Finish line visual */
+    box-shadow: inset 0 0 50px rgba(0, 0, 0, 0.5);
+}
+
+.lane {
+    height: 80px;
+    border-bottom: 2px solid var(--line-color);
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.lane:last-child {
+    border-bottom: none;
+}
+
+.horse {
+    position: absolute;
+    left: 0;
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    /* Top view helmet look */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-weight: bold;
+    color: #fff;
+    font-size: 1.5rem;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
+    transition: transform 0.1s linear;
+    /* Smooth movement update */
+    z-index: 10;
+    transform: translateX(0);
+    /* Will be updated by JS */
+}
+
+/* Name tag floating above horse */
+.horse-name-tag {
+    position: absolute;
+    top: -25px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 0.9rem;
+    white-space: nowrap;
+    background: rgba(0, 0, 0, 0.7);
+    padding: 2px 8px;
+    border-radius: 4px;
+    pointer-events: none;
+}
+
+/* Finish line label */
+#track-container::after {
+    content: "FINISH";
+    position: absolute;
+    right: -60px;
+    top: 50%;
+    transform: translateY(-50%) rotate(90deg);
+    font-size: 2rem;
+    font-weight: bold;
+    color: #fff;
+    letter-spacing: 5px;
+    opacity: 0.5;
+}
+
+/* === Result Screen === */
+.result-title {
+    font-size: 4rem;
+    margin-bottom: 3rem;
+    color: var(--primary-color);
+}
+
+.podium-container {
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    gap: 2rem;
+    margin-bottom: 4rem;
+    height: 300px;
+}
+
+.podium-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+    width: 140px;
+    transition: transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+/* Podium Heights */
+.rank-1 .horse-avatar {
+    transform: scale(1.5);
+    box-shadow: 0 0 30px var(--primary-color);
+}
+
+.rank-2 .horse-avatar {
+    transform: scale(1.2);
+}
+
+.rank-3 .horse-avatar {
+    transform: scale(1.0);
+}
+
+/* Initial state for animation */
+.podium-item {
+    opacity: 0;
+    transform: translateY(50px);
+}
+
+.horse-avatar {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 2rem;
+    font-weight: bold;
+    color: #fff;
+    margin-bottom: 1rem;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+}
+
+.bettor-name {
+    font-size: 1.5rem;
+    font-weight: bold;
+    margin-bottom: 0.5rem;
+    text-align: center;
+}
+
+.rank-label {
+    font-size: 1.2rem;
+    opacity: 0.7;
+}
+
+.crown {
+    font-size: 3rem;
+    margin-bottom: -10px;
+    animation: bounce 2s infinite;
+}
+
+@keyframes bounce {
+
+    0%,
+    100% {
+        transform: translateY(0);
+    }
+
+    50% {
+        transform: translateY(-10px);
+    }
+}
+
+.full-ranking {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+    width: 80%;
+    max-width: 800px;
+    margin-bottom: 2rem;
+    opacity: 0.8;
+}
+
+.rank-item-small {
+    background: #333;
+    padding: 0.8rem;
+    border-radius: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+/* === Status Effects === */
+.horse.boost::after {
+    content: "🔥";
+    position: absolute;
+    right: -30px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 2rem;
+    animation: flash 0.2s infinite alternate;
+}
+
+.horse.boost {
+    box-shadow: 0 0 20px #ff4500, inset 0 0 10px #ffff00;
+    border: 2px solid #fff;
+    z-index: 100 !important;
+}
+
+.horse.fatigue::after {
+    content: "💦";
+    position: absolute;
+    right: -25px;
+    top: 0;
+    font-size: 1.5rem;
+    animation: drip 1s infinite;
+}
+
+.horse.fatigue {
+    filter: grayscale(0.8) brightness(0.8);
+    opacity: 0.7;
+}
+
+@keyframes flash {
+    from {
+        transform: translateY(-50%) scale(1);
+        opacity: 0.8;
+    }
+
+    to {
+        transform: translateY(-50%) scale(1.3);
+        opacity: 1;
+    }
+}
+
+@keyframes drip {
+    0% {
+        transform: translateY(0);
+        opacity: 0.8;
+    }
+
+    100% {
+        transform: translateY(10px);
+        opacity: 0;
+    }
+}

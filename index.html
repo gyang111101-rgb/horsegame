@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>파티용 경마 베팅 게임</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div id="app">
+        <!-- 설정 화면: 베팅 및 시작 -->
+        <div id="setup-screen" class="screen active">
+            <h1 class="game-title">🏇 경마 베팅 파티 🏇</h1>
+            <p class="subtitle">각 말에 베팅할 이름을 입력하세요!</p>
+
+            <div class="betting-list">
+                <!-- 자바스크립트로 생성될 베팅 입력 필드들 -->
+            </div>
+
+            <button id="start-btn" class="primary-btn">경기 시작!</button>
+        </div>
+
+        <!-- 경기 화면: 레이스 진행 -->
+        <div id="race-screen" class="screen">
+            <div class="track-header">
+                <h2>🏁 RACE START 🏁</h2>
+            </div>
+
+            <div id="track-container">
+                <!-- 자바스크립트로 트랙과 말 생성 -->
+            </div>
+        </div>
+
+        <!-- 결과 화면: 순위 및 시상 -->
+        <div id="result-screen" class="screen">
+            <h1 class="result-title">🏆 경기 결과 🏆</h1>
+
+            <div class="podium-container">
+                <div class="podium-item rank-2">
+                    <div class="horse-avatar"></div>
+                    <div class="bettor-name"></div>
+                    <div class="rank-label">2등</div>
+                </div>
+                <div class="podium-item rank-1">
+                    <div class="crown">👑</div>
+                    <div class="horse-avatar"></div>
+                    <div class="bettor-name"></div>
+                    <div class="rank-label">1등</div>
+                </div>
+                <div class="podium-item rank-3">
+                    <div class="horse-avatar"></div>
+                    <div class="bettor-name"></div>
+                    <div class="rank-label">3등</div>
+                </div>
+            </div>
+
+            <div class="full-ranking">
+                <!-- 4~6등 목록 표시 -->
+            </div>
+
+            <button id="reset-btn" class="secondary-btn">다시 하기</button>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+
+</html>
