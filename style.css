@@ -42,8 +42,10 @@ body {
 
 #app {
     width: 100%;
-    max-width: 1200px;
-    height: 90vh;
+    max-width: 95vw;
+    /* Use 95% of viewport width */
+    height: 95vh;
+    /* Increased from 90vh */
     position: relative;
     overflow: hidden;
 }
@@ -176,12 +178,12 @@ button {
 
 #race-layout {
     display: flex;
-    width: 95%;
+    width: 98%;
+    /* Increased from 95% */
     height: 90%;
-    /* Increased height */
-    gap: 2%;
+    gap: 1.5%;
+    /* Slightly reduced gap */
     position: relative;
-    /* For countdown overlay */
 }
 
 #track-container {
@@ -451,38 +453,116 @@ button {
     transition: transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
-/* Podium Heights */
-.rank-1 .horse-avatar {
-    transform: scale(1.5);
-    box-shadow: 0 0 30px var(--primary-color);
+/* === Result Screen === */
+.result-title {
+    font-size: 4rem;
+    margin-bottom: 4rem;
+    /* Increased from 2rem to fix overlap */
+    color: var(--primary-color);
+    text-shadow: 0 0 20px rgba(255, 204, 0, 0.5);
 }
 
-.rank-2 .horse-avatar {
-    transform: scale(1.2);
+.podium-container {
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    gap: 1rem;
+    margin-bottom: 4rem;
+    height: 350px;
+    /* Increased height for bigger winner */
+    position: relative;
 }
 
-.rank-3 .horse-avatar {
-    transform: scale(1.0);
-}
-
-/* Initial state for animation */
 .podium-item {
-    opacity: 0;
-    transform: translateY(50px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+    width: 140px;
+    transition: transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    z-index: 1;
+    /* Default z-index */
 }
 
+/* Podium Heights & Styles */
+.rank-1 {
+    order: 2;
+    /* Ensure it's in middle visually if not using absolute */
+    z-index: 10;
+    margin-bottom: 20px;
+}
+
+.rank-1 .horse-avatar {
+    width: 140px;
+    /* Much bigger */
+    height: 140px;
+    font-size: 4rem;
+    box-shadow: 0 0 50px var(--primary-color), 0 0 100px rgba(255, 215, 0, 0.5);
+    border: 5px solid #fff;
+    animation: winner-pulse 2s infinite;
+}
+
+.rank-1 .bettor-name {
+    font-size: 2.5rem;
+    /* Bigger Name */
+    color: #ffd700;
+    text-shadow: 0 2px 5px rgba(0, 0, 0, 0.8);
+    margin-top: 1rem;
+}
+
+.rank-1 .crown {
+    font-size: 5rem;
+    margin-bottom: -20px;
+    filter: drop-shadow(0 0 15px gold);
+}
+
+.rank-2,
+.rank-3 {
+    opacity: 0.6;
+    transform: scale(0.6);
+    margin-bottom: 0;
+}
+
+.rank-2 {
+    order: 1;
+}
+
+.rank-3 {
+    order: 3;
+}
+
+@keyframes winner-pulse {
+    0% {
+        transform: scale(1);
+        box-shadow: 0 0 50px var(--primary-color);
+    }
+
+    50% {
+        transform: scale(1.05);
+        box-shadow: 0 0 70px var(--primary-color), 0 0 120px rgba(255, 215, 0, 0.8);
+    }
+
+    100% {
+        transform: scale(1);
+        box-shadow: 0 0 50px var(--primary-color);
+    }
+}
+
+/* === Restored Base Styles === */
 .horse-avatar {
-    width: 80px;
-    height: 80px;
+    width: 100px;
+    height: 100px;
     border-radius: 50%;
     display: flex;
     justify-content: center;
     align-items: center;
-    font-size: 2rem;
+    font-size: 2.5rem;
     font-weight: bold;
     color: #fff;
     margin-bottom: 1rem;
     box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+    background-color: #555;
+    /* Fallback */
 }
 
 .bettor-name {
@@ -490,6 +570,7 @@ button {
     font-weight: bold;
     margin-bottom: 0.5rem;
     text-align: center;
+    color: #fff;
 }
 
 .rank-label {
@@ -500,25 +581,14 @@ button {
 .crown {
     font-size: 3rem;
     margin-bottom: -10px;
-    animation: bounce 2s infinite;
-}
-
-@keyframes bounce {
-
-    0%,
-    100% {
-        transform: translateY(0);
-    }
-
-    50% {
-        transform: translateY(-10px);
-    }
+    /* bounce animation removed for rank 1 specific override, but kept here if needed */
 }
 
 .full-ranking {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 1rem;
+    grid-template-columns: 1fr;
+    /* Single column list */
+    gap: 0.8rem;
     width: 80%;
     max-width: 800px;
     margin-bottom: 2rem;
