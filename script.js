@@ -5,6 +5,95 @@ const STATE = {
     FINISHED: 'finished'
 };
 
+// --- AUDIO SYSTEM (Web Audio API) ---
+const AudioSys = {
+    ctx: null,
+    init: () => {
+        if (!AudioSys.ctx) {
+            AudioSys.ctx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+    },
+    resume: () => {
+        if (AudioSys.ctx && AudioSys.ctx.state === 'suspended') {
+            AudioSys.ctx.resume();
+        }
+    },
+    playTone: (freq, type, duration, vol = 0.1) => {
+        if (!AudioSys.ctx) return;
+        const osc = AudioSys.ctx.createOscillator();
+        const gain = AudioSys.ctx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, AudioSys.ctx.currentTime);
+        gain.gain.setValueAtTime(vol, AudioSys.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, AudioSys.ctx.currentTime + duration);
+        osc.connect(gain);
+        gain.connect(AudioSys.ctx.destination);
+        osc.start();
+        osc.stop(AudioSys.ctx.currentTime + duration);
+    },
+    playNoise: (duration) => { // Gunshot like
+        if (!AudioSys.ctx) return;
+        const bufferSize = AudioSys.ctx.sampleRate * duration;
+        const buffer = AudioSys.ctx.createBuffer(1, bufferSize, AudioSys.ctx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) {
+            data[i] = Math.random() * 2 - 1;
+        }
+        const noise = AudioSys.ctx.createBufferSource();
+        noise.buffer = buffer;
+        const gain = AudioSys.ctx.createGain();
+        gain.gain.setValueAtTime(0.5, AudioSys.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, AudioSys.ctx.currentTime + duration);
+        noise.connect(gain);
+        gain.connect(AudioSys.ctx.destination);
+        noise.start();
+    },
+    // SFX Methods
+    click: () => {
+        AudioSys.init(); AudioSys.resume();
+        AudioSys.playTone(1200, 'sine', 0.1, 0.1);
+    },
+    count: () => AudioSys.playTone(600, 'square', 0.1, 0.1),
+    gunshot: () => {
+        AudioSys.playNoise(0.5);
+        AudioSys.playTone(100, 'sawtooth', 0.5, 0.5);
+    },
+    boost: () => { // Whoosh up
+        if (!AudioSys.ctx) return;
+        const osc = AudioSys.ctx.createOscillator();
+        const gain = AudioSys.ctx.createGain();
+        const now = AudioSys.ctx.currentTime;
+        osc.frequency.setValueAtTime(200, now);
+        osc.frequency.exponentialRampToValueAtTime(1000, now + 0.3);
+        gain.gain.setValueAtTime(0.05, now); // Quiet whoosh
+        gain.gain.linearRampToValueAtTime(0, now + 0.3);
+        osc.connect(gain);
+        gain.connect(AudioSys.ctx.destination);
+        osc.start();
+        osc.stop(now + 0.3);
+    },
+    fanfare: () => {
+        if (!AudioSys.ctx) return;
+        const now = AudioSys.ctx.currentTime;
+        const notes = [523.25, 659.25, 783.99, 1046.50, 783.99, 1046.50]; // C E G C G C (Arpeggio)
+        const times = [0, 0.2, 0.4, 0.6, 0.8, 1.2];
+        const lens = [0.2, 0.2, 0.2, 0.2, 0.2, 1.0];
+
+        notes.forEach((freq, i) => {
+            const osc = AudioSys.ctx.createOscillator();
+            const gain = AudioSys.ctx.createGain();
+            osc.frequency.value = freq;
+            osc.type = 'triangle';
+            osc.connect(gain);
+            gain.connect(AudioSys.ctx.destination);
+            osc.start(now + times[i]);
+            gain.gain.setValueAtTime(0.2, now + times[i]);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + times[i] + lens[i]);
+            osc.stop(now + times[i] + lens[i]);
+        });
+    }
+};
+
 let currentState = STATE.SETUP;
 let animationFrameId = null;
 
@@ -27,22 +116,32 @@ let horses = [];
 
 // DOM Elements
 const app = document.getElementById('app');
-const screens = {
-    setup: document.getElementById('setup-screen'),
-    race: document.getElementById('race-screen'),
-    result: document.getElementById('result-screen')
-};
+const setupScreen = document.getElementById('setup-screen');
+const raceScreen = document.getElementById('race-screen');
+const resultScreen = document.getElementById('result-screen');
 
 const bettingListEl = document.querySelector('.betting-list');
 const trackContainerEl = document.getElementById('track-container');
 const startBtn = document.getElementById('start-btn');
 const resetBtn = document.getElementById('reset-btn');
 
-// Initialize Game
+// Event Listeners
+document.getElementById('start-btn').addEventListener('click', () => {
+    AudioSys.click();
+    startRace();
+});
+document.getElementById('reset-btn').addEventListener('click', () => {
+    AudioSys.click();
+    resetGame();
+});
+
+// Initialize on load
+document.addEventListener('click', () => {
+    AudioSys.init(); // Ensure audio context is ready on first interaction
+}, { once: true });
+
 function init() {
     createBettingInputs();
-    startBtn.addEventListener('click', startRace);
-    resetBtn.addEventListener('click', resetGame);
 }
 
 function createBettingInputs() {
@@ -76,13 +175,20 @@ function createBettingInputs() {
 }
 
 function switchScreen(screenName) {
-    Object.values(screens).forEach(s => {
+    // Map screenName to the new individual screen elements
+    const screensMap = {
+        'setup': setupScreen,
+        'race': raceScreen,
+        'result': resultScreen
+    };
+
+    Object.values(screensMap).forEach(s => {
         s.classList.remove('active');
         s.style.display = 'none'; // Force hide for clean transition logic
     });
 
     // Tiny delay to allow display:none to apply then flex
-    const target = screens[screenName];
+    const target = screensMap[screenName];
     target.style.display = 'flex';
 
     // Force reflow for transition
@@ -107,13 +213,61 @@ function startRace() {
     setupTrack();
     switchScreen('race');
 
-    // Start countdown or just go? "RACE START" header is there.
-    // Let's create a small delay before they start running
-    setTimeout(() => {
+    // Start Countdown Sequence
+    runCountdown(() => {
+        // Random start boost for 3 horses to create initial separation
+        const shuffledIndices = [0, 1, 2, 3, 4, 5].sort(() => Math.random() - 0.5);
+        for (let i = 0; i < 3; i++) {
+            const h = horses[shuffledIndices[i]];
+            h.mode = 'boost';
+            h.modeTimer = 200; // Short 0.2s visual/speed boost
+            h.speed = 0.2; // Slight head start velocity
+        }
+
         currentState = STATE.RACING;
         lastTime = performance.now();
+        raceStartTime = lastTime; // Set start time
         animationFrameId = requestAnimationFrame(raceLoop);
-    }, 1000);
+    });
+}
+
+function runCountdown(onComplete) {
+    const overlay = document.getElementById('countdown-overlay');
+    const steps = ['3', '2', '1', '탕!'];
+    let stepIndex = 0;
+
+    overlay.style.display = 'block';
+
+    const nextStep = () => {
+        if (stepIndex >= steps.length) {
+            overlay.style.display = 'none';
+            onComplete();
+            return;
+        }
+
+        // Reset animation
+        overlay.style.animation = 'none';
+        overlay.offsetHeight; /* trigger reflow */
+        overlay.style.animation = 'zoomIn 0.5s ease-out';
+
+        overlay.textContent = steps[stepIndex];
+
+        // Color & Sound logic
+        if (stepIndex === 3) { // '탕!'
+            overlay.style.color = '#ff4500';
+            overlay.style.textShadow = '0 0 50px #ff0000';
+            AudioSys.gunshot();
+        } else {
+            overlay.style.color = '#fff';
+            overlay.style.textShadow = '0 0 30px rgba(255, 204, 0, 0.8)';
+            AudioSys.count();
+        }
+
+        stepIndex++;
+        setTimeout(nextStep, 1000); // 1 second per step
+    };
+
+    nextStep();
 }
 
 function setupTrack() {
@@ -124,9 +278,14 @@ function setupTrack() {
         h.position = 0;
         h.speed = 0;
         h.rank = null;
+        h.rank = null;
         h.finished = false;
+        h.finishTime = null; // Reset time
+        h.mode = 'normal'; // normal, boost, fatigue
         h.mode = 'normal'; // normal, boost, fatigue
         h.modeTimer = 0;
+        h.prevRank = index;
+        h.prevRank = index; // Initialize previous rank for tracking changes
 
         // Create Lane
         const lane = document.createElement('div');
@@ -136,14 +295,26 @@ function setupTrack() {
         const horseEl = document.createElement('div');
         horseEl.className = 'horse';
         horseEl.id = `horse-${index}`;
-        horseEl.textContent = h.id;
-        horseEl.style.backgroundColor = h.color;
 
-        // Name Tag
-        const tag = document.createElement('div');
-        tag.className = 'horse-name-tag';
-        tag.textContent = h.bettor;
-        horseEl.appendChild(tag);
+        // Structure: Visual Wrapper (flipped) + Badge (colored) + Name Tag
+        // Note: We use 🏇 (Horse Racing) emoji. It usually faces Left. We need to flip it to face Right.
+        const visual = document.createElement('div');
+        visual.className = 'horse-visual';
+        visual.textContent = '🏇';
+        horseEl.appendChild(visual);
+
+        const badge = document.createElement('div');
+        badge.className = 'horse-badge';
+        badge.textContent = h.id;
+        badge.style.backgroundColor = h.color;
+        badge.style.boxShadow = `0 0 10px ${h.color}`;
+        horseEl.appendChild(badge);
+
+        // Name Tag removed as per request
+        // const tag = document.createElement('div');
+        // tag.className = 'horse-name-tag';
+        // tag.textContent = h.bettor;
+        // horseEl.appendChild(tag);
 
         lane.appendChild(horseEl);
         trackContainerEl.appendChild(lane);
@@ -153,6 +324,7 @@ function setupTrack() {
 // Stats for physics
 // Stats for physics
 let lastTime = 0;
+let raceStartTime = 0; // To track race duration
 const MIN_SPEED = 0.1; // A bit faster start
 const MAX_SPEED = 0.6; // 1:2 ratio speed (was 0.7 -> 0.5, so 0.6ish)
 const ACCEL_VARIANCE = 0.02;
@@ -185,6 +357,10 @@ function raceLoop(time) {
             if (rand < 0.05) {
                 h.mode = 'boost';
                 h.modeTimer = 2000 + Math.random() * 3000; // 2-5s boost
+
+                // Play boost sound (throttle to avoid chaos if multiple happen at once)
+                if (Math.random() < 0.5) AudioSys.boost();
+
             } else if (rand < 0.15) {
                 h.mode = 'fatigue';
                 h.modeTimer = 2000 + Math.random() * 2000; // 2-4s slow
@@ -252,11 +428,17 @@ function raceLoop(time) {
         }
 
         // Check Finish
-        if (h.position >= 92) {
+        if (h.position >= 92 && !h.finished) {
             h.finished = true;
             h.rank = horses.filter(x => x.finished).length; // 1, 2, 3...
+            h.finishTime = ((time - raceStartTime) / 1000).toFixed(2); // Record time
         }
     });
+
+    // Update Live Ranking every 10 frames to avoid DOM thrashing
+    if (Math.floor(time / 16) % 10 === 0) {
+        updateLiveRanking();
+    }
 
     if (allFinished) {
         currentState = STATE.FINISHED;
@@ -266,8 +448,58 @@ function raceLoop(time) {
     }
 }
 
+function updateLiveRanking() {
+    // Sort logic: Finshed horses first (by rank), then running horses (by position desc)
+    const sorted = [...horses].sort((a, b) => {
+        if (a.finished && b.finished) return a.rank - b.rank;
+        if (a.finished) return -1;
+        if (b.finished) return 1;
+        return b.position - a.position;
+    });
+
+    const rankingListEl = document.querySelector('.ranking-list');
+    rankingListEl.innerHTML = '';
+
+    sorted.forEach((h, i) => {
+        const currentRank = i; // 0-based
+        // Calculate Rank Change
+        const rankDiff = h.prevRank - currentRank; // Positive = Improved (moved up index 5 -> 0)
+
+        let changeIcon = '<span class="rank-change same">-</span>';
+        if (rankDiff > 0) changeIcon = '<span class="rank-change up">▲</span>';
+        else if (rankDiff < 0) changeIcon = '<span class="rank-change down">▼</span>';
+
+        // Update prevRank for next frame
+        h.prevRank = currentRank;
+
+        const item = document.createElement('div');
+        item.className = 'rank-card';
+        if (i === 0) item.classList.add('leader');
+
+        item.style.borderLeftColor = h.color;
+        item.innerHTML = `
+            <span class="rank-num" style="color:${h.color}">${i + 1}</span>
+            ${changeIcon}
+            <div data-id="${h.id}" style="
+                width: 24px; height: 24px; 
+                background: ${h.color}; 
+                border-radius: 50%; 
+                display: flex; justify-content: center; align-items: center; 
+                color: #fff; margin-right: 10px; font-size: 0.8rem; font-weight:bold;">
+                ${h.id}
+            </div>
+            <span class="bettor-name-rank">
+                ${h.bettor}
+            </span>
+            ${h.finished ? `<span style="font-size:0.9rem; color:#ccc; margin-left:5px;">${h.finishTime}s</span> <span class="finish-flag">🚩</span>` : ''}
+        `;
+        rankingListEl.appendChild(item);
+    });
+}
+
 function showResults() {
     switchScreen('result');
+    AudioSys.fanfare(); // Play victory sound
 
     // Sort horses by rank
     const sortedHorses = [...horses].sort((a, b) => a.rank - b.rank);
@@ -285,6 +517,19 @@ function showResults() {
             p.el.querySelector('.horse-avatar').style.backgroundColor = horse.color;
             p.el.querySelector('.horse-avatar').textContent = horse.id;
             p.el.querySelector('.bettor-name').textContent = horse.bettor;
+
+            // Add time display to podium
+            let timeEl = p.el.querySelector('.podium-time');
+            if (!timeEl) {
+                timeEl = document.createElement('div');
+                timeEl.className = 'podium-time';
+                timeEl.style.color = '#fff';
+                timeEl.style.fontSize = '1.2rem';
+                timeEl.style.fontWeight = 'bold';
+                timeEl.style.marginTop = '0.5rem';
+                p.el.appendChild(timeEl);
+            }
+            timeEl.textContent = `${horse.finishTime}s`;
 
             // Animation trigger
             p.el.style.opacity = '1';
@@ -312,6 +557,7 @@ function showResults() {
                 <div style="width:20px; height:20px; border-radius:50%; background:${horse.color}; margin-right:10px; display:flex; justify-content:center; align-items:center; font-size:0.8rem;">${horse.id}</div>
                 <span>${horse.bettor}</span>
             </div>
+            <span style="color:#ffd700; font-weight:bold;">${horse.finishTime}s</span>
         `;
         rankingContainer.appendChild(item);
     }
