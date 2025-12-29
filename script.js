@@ -306,6 +306,10 @@ function runCountdown(onComplete) {
 function setupTrack() {
     trackContainerEl.innerHTML = '';
 
+    // Initialize ranking cards once
+    const rankingListEl = document.querySelector('.ranking-list');
+    rankingListEl.innerHTML = '';
+
     horses.forEach((h, index) => {
         // Reset state
         h.position = 0;
@@ -351,6 +355,13 @@ function setupTrack() {
 
         lane.appendChild(horseEl);
         trackContainerEl.appendChild(lane);
+
+        // Create ranking card for this horse
+        const rankCard = document.createElement('div');
+        rankCard.className = 'rank-card';
+        rankCard.setAttribute('data-horse-id', h.id);
+        rankCard.style.order = index;
+        rankingListEl.appendChild(rankCard);
     });
 }
 
@@ -497,7 +508,7 @@ function raceLoop(time) {
 }
 
 function updateLiveRanking() {
-    // Sort logic: Finshed horses first (by rank), then running horses (by position desc)
+    // Sort logic: Finished horses first (by rank), then running horses (by position desc)
     const sorted = [...horses].sort((a, b) => {
         if (a.finished && b.finished) return a.rank - b.rank;
         if (a.finished) return -1;
@@ -506,12 +517,11 @@ function updateLiveRanking() {
     });
 
     const rankingListEl = document.querySelector('.ranking-list');
-    rankingListEl.innerHTML = '';
 
     sorted.forEach((h, i) => {
         const currentRank = i; // 0-based
         // Calculate Rank Change
-        const rankDiff = h.prevRank - currentRank; // Positive = Improved (moved up index 5 -> 0)
+        const rankDiff = h.prevRank - currentRank;
 
         let changeIcon = '<span class="rank-change same">-</span>';
         if (rankDiff > 0) changeIcon = '<span class="rank-change up">▲</span>';
@@ -520,15 +530,24 @@ function updateLiveRanking() {
         // Update prevRank for next frame
         h.prevRank = currentRank;
 
-        const item = document.createElement('div');
-        item.className = 'rank-card';
-        if (i === 0) item.classList.add('leader');
+        // Find existing card for this horse
+        const card = rankingListEl.querySelector(`.rank-card[data-horse-id="${h.id}"]`);
+        if (!card) return;
 
-        item.style.borderLeftColor = h.color;
-        item.innerHTML = `
+        // Update card styling
+        if (i === 0) {
+            card.classList.add('leader');
+        } else {
+            card.classList.remove('leader');
+        }
+
+        card.style.borderLeftColor = h.color;
+
+        // Update card content
+        card.innerHTML = `
             <span class="rank-num" style="color:${h.color}">${i + 1}</span>
             ${changeIcon}
-            <div data-id="${h.id}" style="
+            <div style="
                 width: 24px; height: 24px; 
                 background: ${h.color}; 
                 border-radius: 50%; 
@@ -541,7 +560,9 @@ function updateLiveRanking() {
             </span>
             ${h.finished ? `<span style="font-size:0.9rem; color:#ccc; margin-left:5px;">${h.finishTime}s</span> <span class="finish-flag">🚩</span>` : ''}
         `;
-        rankingListEl.appendChild(item);
+
+        // Set order for smooth animation
+        card.style.order = i;
     });
 }
 
