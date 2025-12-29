@@ -58,19 +58,51 @@ const AudioSys = {
         AudioSys.playNoise(0.5);
         AudioSys.playTone(100, 'sawtooth', 0.5, 0.5);
     },
-    boost: () => { // Whoosh up
+    boost: () => { // Whoosh up - louder and more prominent
         if (!AudioSys.ctx) return;
         const osc = AudioSys.ctx.createOscillator();
         const gain = AudioSys.ctx.createGain();
         const now = AudioSys.ctx.currentTime;
-        osc.frequency.setValueAtTime(200, now);
-        osc.frequency.exponentialRampToValueAtTime(1000, now + 0.3);
-        gain.gain.setValueAtTime(0.05, now); // Quiet whoosh
-        gain.gain.linearRampToValueAtTime(0, now + 0.3);
+        osc.frequency.setValueAtTime(150, now);
+        osc.frequency.exponentialRampToValueAtTime(1500, now + 0.5);
+        osc.type = 'sawtooth'; // More aggressive sound
+        gain.gain.setValueAtTime(0.25, now); // Much louder
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
         osc.connect(gain);
         gain.connect(AudioSys.ctx.destination);
         osc.start();
-        osc.stop(now + 0.3);
+        osc.stop(now + 0.5);
+    },
+    fatigue: () => { // Downward slide
+        if (!AudioSys.ctx) return;
+        const osc = AudioSys.ctx.createOscillator();
+        const gain = AudioSys.ctx.createGain();
+        const now = AudioSys.ctx.currentTime;
+        osc.frequency.setValueAtTime(300, now);
+        osc.frequency.linearRampToValueAtTime(100, now + 0.5);
+        gain.gain.setValueAtTime(0.1, now);
+        gain.gain.linearRampToValueAtTime(0, now + 0.5);
+        osc.connect(gain);
+        gain.connect(AudioSys.ctx.destination);
+        osc.start();
+        osc.stop(now + 0.5);
+    },
+    gallop: () => { // Rhythmic clop
+        if (!AudioSys.ctx) return;
+        const now = AudioSys.ctx.currentTime;
+        // Double beat (ta-tum)
+        [0, 0.15].forEach(offset => {
+            const osc = AudioSys.ctx.createOscillator();
+            const gain = AudioSys.ctx.createGain();
+            osc.frequency.value = 150; // Low thud
+            osc.type = 'triangle';
+            gain.gain.setValueAtTime(0.05, now + offset);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + offset + 0.1);
+            osc.connect(gain);
+            gain.connect(AudioSys.ctx.destination);
+            osc.start(now + offset);
+            osc.stop(now + offset + 0.1);
+        });
     },
     fanfare: () => {
         if (!AudioSys.ctx) return;
@@ -96,6 +128,7 @@ const AudioSys = {
 
 let currentState = STATE.SETUP;
 let animationFrameId = null;
+let gallopTimer = 0; // For scheduling gallop sounds
 
 // Game Configuration
 const HORSE_COUNT = 6;
@@ -233,7 +266,7 @@ function startRace() {
 
 function runCountdown(onComplete) {
     const overlay = document.getElementById('countdown-overlay');
-    const steps = ['3', '2', '1', '탕!'];
+    const steps = ['3', '2', '1', '🔫'];
     let stepIndex = 0;
 
     overlay.style.display = 'block';
@@ -336,6 +369,13 @@ function raceLoop(time) {
     const delta = time - lastTime;
     lastTime = time;
 
+    // --- Gallop Sound Loop ---
+    gallopTimer += delta;
+    if (gallopTimer > 350) { // Play every ~350ms
+        AudioSys.gallop();
+        gallopTimer = 0;
+    }
+
     let allFinished = true;
 
     // Calculate current ranks for rubber banding
@@ -358,12 +398,18 @@ function raceLoop(time) {
                 h.mode = 'boost';
                 h.modeTimer = 2000 + Math.random() * 3000; // 2-5s boost
 
-                // Play boost sound (throttle to avoid chaos if multiple happen at once)
-                if (Math.random() < 0.5) AudioSys.boost();
+                // Always play boost sound
+                AudioSys.resume();
+                AudioSys.boost();
 
             } else if (rand < 0.15) {
                 h.mode = 'fatigue';
                 h.modeTimer = 2000 + Math.random() * 2000; // 2-4s slow
+
+                // Always play fatigue sound
+                AudioSys.resume();
+                AudioSys.fatigue();
+
             } else {
                 h.mode = 'normal';
                 h.modeTimer = 1000 + Math.random() * 2000;
@@ -371,7 +417,6 @@ function raceLoop(time) {
         }
 
         // --- 2. Speed Calculation ---
-        let targetSpeed = h.speed;
         let accel = (Math.random() - 0.5) * ACCEL_VARIANCE;
 
         // Apply Mode Effects
@@ -381,17 +426,20 @@ function raceLoop(time) {
             accel -= 0.008; // Slight drag
         }
 
-        // Rubber Banding (Catch-up & Drama)
-        if (leader && h !== leader && (leader.position - h.position) > 15) {
-            accel += 0.01; // Help stragglers
+        // Very subtle catch-up mechanic (only for extreme gaps)
+        if (leader && h !== leader && (leader.position - h.position) > 25) {
+            accel += 0.005; // Very gentle help for far stragglers
         }
         if (leader === h && activeHorses.length > 1) {
-            // Leader nervousness (slight random drag to allow overtakes)
-            if (Math.random() < 0.1) accel -= 0.02;
+            // Very rare leader nervousness
+            if (Math.random() < 0.05) accel -= 0.01;
         }
 
         h.speed += accel;
         h.speed = Math.max(MIN_SPEED, Math.min(MAX_SPEED, h.speed));
+
+
+
 
         // --- 3. Position Update ---
         h.position += h.speed * (delta / 16) * DISTANCE_SCALE;
@@ -504,11 +552,9 @@ function showResults() {
     // Sort horses by rank
     const sortedHorses = [...horses].sort((a, b) => a.rank - b.rank);
 
-    // Fill Podium
+    // Fill Podium (Only Rank 1)
     const podiums = [
-        { rank: 1, el: document.querySelector('.rank-1') },
-        { rank: 2, el: document.querySelector('.rank-2') },
-        { rank: 3, el: document.querySelector('.rank-3') }
+        { rank: 1, el: document.querySelector('.rank-1') }
     ];
 
     podiums.forEach(p => {
@@ -537,27 +583,27 @@ function showResults() {
         }
     });
 
-    // Animate podium appearance staggered
+    // Animate podium appearance
     podiums.forEach((p, i) => {
         p.el.style.transitionDelay = `${i * 200}ms`;
-        // Force reflow handled by switchScreen void
     });
 
-    // Fill remaining ranks
+    // Fill remaining ranks (Rank 2 ~ 6)
     const rankingContainer = document.querySelector('.full-ranking');
     rankingContainer.innerHTML = '';
 
-    for (let i = 3; i < sortedHorses.length; i++) {
+    for (let i = 1; i < sortedHorses.length; i++) {
         const horse = sortedHorses[i];
         const item = document.createElement('div');
         item.className = 'rank-item-small';
+        item.style.borderLeft = `5px solid ${horse.color}`;
         item.innerHTML = `
-            <span style="font-weight:bold; color:#aaa;">${i + 1}등</span>
-            <div style="display:flex; align-items:center;">
-                <div style="width:20px; height:20px; border-radius:50%; background:${horse.color}; margin-right:10px; display:flex; justify-content:center; align-items:center; font-size:0.8rem;">${horse.id}</div>
-                <span>${horse.bettor}</span>
+            <span style="font-weight:bold; color:#aaa; width:40px;">${i + 1}등</span>
+            <div style="display:flex; align-items:center; flex:1;">
+                <div style="width:24px; height:24px; border-radius:50%; background:${horse.color}; margin-right:15px; display:flex; justify-content:center; align-items:center; color:#fff; font-weight:bold;">${horse.id}</div>
+                <span style="font-size:1.2rem;">${horse.bettor}</span>
             </div>
-            <span style="color:#ffd700; font-weight:bold;">${horse.finishTime}s</span>
+            <span style="color:#ffd700; font-weight:bold; font-size:1.1rem;">${horse.finishTime}s</span>
         `;
         rankingContainer.appendChild(item);
     }
